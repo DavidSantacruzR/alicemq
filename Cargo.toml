@@ -1,0 +1,8 @@
+[package]
+name = "alice"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rabbitmq-stream-client = "*"
+tokio = { version = "1", features = ["full"] }
