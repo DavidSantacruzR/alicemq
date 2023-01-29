@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 rabbitmq-stream-client = "*"
 tokio = { version = "1", features = ["full"] }
+futures = "0.3.0"
+tracing = "0.1"
+tracing-subscriber = "0.3.16"

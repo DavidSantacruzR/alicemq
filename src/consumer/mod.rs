@@ -1,7 +1,10 @@
-use tokio::task;
-use std::fmt;
+use tokio::{task};
+use futures::StreamExt;
+use tracing::{info, Level};
 use rabbitmq_stream_client::{Environment};
 use rabbitmq_stream_client::error::{StreamCreateError};
+use rabbitmq_stream_client::types::OffsetSpecification;
+use tracing_subscriber::FmtSubscriber;
 
 pub struct Callback {
     event_queue : String,
@@ -12,14 +15,20 @@ impl Callback {
     pub fn new() -> CallbackBuilder {
         CallbackBuilder::default()
     }
-    pub async fn handle(mut self) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(format!("Message handled"))
+    pub async fn handle(&mut self) -> Result<(), Box<dyn std::error::Error>>{
+        let subscriber = FmtSubscriber::builder()
+            .with_max_level(Level::TRACE)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+        let event_queue = self.event_queue.clone();
+        let mut consumer = self.environment.consumer().offset(OffsetSpecification::First).build(event_queue.as_str()).await?;
+        task::spawn( async move {
+            while let Some(delivery) = consumer.next().await {
+                info!("Got message {:?}", delivery)
+            }
+        });
+        Ok(())
     }
-}
-
-#[derive(Debug, Default)]
-pub struct ConsumerHandler {
-    data: String
 }
 
 #[derive(Default)]
@@ -48,11 +57,10 @@ impl CallbackBuilder {
         self.environment.get_or_insert(environment);
         Ok(self)
     }
-    pub async fn consume(self, consumer_handler: ConsumerHandler) -> Callback {
-        println!("{:?}", consumer_handler.data);
-        Callback {
-            event_queue: self.event_queue.unwrap(),
-            environment: self.environment.unwrap()
-        }
+    pub async fn callback(self) -> Result<Callback, Box<dyn std::error::Error>> {
+        Ok(Callback {
+            event_queue: self.event_queue.ok_or("Not possible to create event queue.")?,
+            environment: self.environment.ok_or("Not possible to fetch environment")?
+        })
     }
 }
