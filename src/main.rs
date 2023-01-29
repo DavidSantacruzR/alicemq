@@ -1,14 +1,21 @@
 mod consumer;
-mod loan_handlers;
-use crate::consumer::{Callback, ConsumerHandler};
+mod producer;
+use crate::consumer::{Callback};
+use crate::producer::{Publisher};
 
 #[tokio::main]
 async fn main() -> Result<(), Box< dyn std::error::Error>> {
-    let new_handler = ConsumerHandler::default();
-    let new_consumer = Callback::new()
-        .queue("loan_request")
+    let mut new_consumer = Callback::new()
+        .queue("loan_disbursed")
         .await?
-        .consume(new_handler)
-        .await;
+        .callback()
+        .await?;
+    new_consumer.handle().await?;
+
+    let publisher = Publisher::new()
+        .event_queue("loan_disbursed".to_string())
+        .data("Some data".to_string())
+        .build();
+    publisher.send_message().await?;
     Ok(())
 }
